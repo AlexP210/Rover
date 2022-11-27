@@ -18,7 +18,6 @@
             "includePath": [
                 "C:\\Users\\Alex\\AppData\\Local\\Arduino15\\packages\\arduino\\hardware\\avr\\1.8.5\\cores\\arduino",
                 "C:\\Users\\Alex\\AppData\\Local\\Arduino15\\packages\\arduino\\hardware\\avr\\1.8.5\\variants\\standard",
-                "C:\\Users\\Alex\\AppData\\Local\\Arduino15\\packages\\arduino\\hardware\\avr\\1.8.5\\libraries\\SoftwareSerial\\src",
                 "C:\\Users\\Alex\\OneDrive\\Documents\\Arduino\\libraries\\ArduCAM",
                 "C:\\Users\\Alex\\AppData\\Local\\Arduino15\\packages\\arduino\\hardware\\avr\\1.8.5\\libraries\\SPI\\src",
                 "C:\\Users\\Alex\\AppData\\Local\\Arduino15\\packages\\arduino\\hardware\\avr\\1.8.5\\libraries\\Wire\\src",
