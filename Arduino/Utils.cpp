@@ -54,12 +54,13 @@ String getTerm(String command, int index) {
 // State checker
 bool checkState(int leftDriveDuration, int rightDriveDuration, int leftDriveDirection, int rightDriveDirection) {
     if (!(leftDriveDuration >= 0 || rightDriveDuration >= 0)) {return false;}
-    if (!(leftDriveDirection == 1 || leftDriveDirection == -1)) {return false;}
-    if (!(rightDriveDirection == 1 || rightDriveDirection == -1)) {return false;}
+    if (!(leftDriveDirection == 1 || leftDriveDirection == -1 || leftDriveDirection == 0)) {return false;}
+    if (!(rightDriveDirection == 1 || rightDriveDirection == -1 || rightDriveDirection == 0)) {return false;}
     return true;
 }
 
-ArduCAM initializeCamera(ArduCAM camera){
+ArduCAM initializeCamera(int CAMERA_CS){
+    ArduCAM camera(OV2640, CAMERA_CS);
     camera.write_reg(0x07, 0x80);
     delay(100);
     camera.write_reg(0x07, 0x00);

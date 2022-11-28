@@ -2,6 +2,9 @@
 #include "UpdateFunctions.h"
 #include "Utils.h"
 
+// Debug flag
+bool debug = false;
+
 // Define pins
 const int LEFT_ENABLE = 2;
 const int RIGHT_ENABLE = 3;
@@ -14,7 +17,8 @@ const int CAMERA_CS = 7;
 // State variables
 float leftDriveStartTime; float leftDriveDuration; int leftDriveDirection;
 float rightDriveStartTime; float rightDriveDuration; int rightDriveDirection;
-ArduCAM camera(OV2640, CAMERA_CS); bool capturePhoto; bool _capturedPhoto; bool sendPhoto;
+ArduCAM camera;
+bool capturePhoto; bool _capturedPhoto; bool sendPhoto;
 
 // Command handling
 String command;
@@ -22,9 +26,13 @@ String subcommand;
 bool commandHandled;
 
 void setup() {
+    
+    if (debug) {Serial.println("Entering Setup");}
+
     // Open the communication lines
     Serial.begin(9600);
     SPI.begin();
+    Wire.begin();
 
     // Configure output pins
     pinMode(LED_BUILTIN, OUTPUT); digitalWrite(LED_BUILTIN, LOW);
@@ -37,7 +45,10 @@ void setup() {
     pinMode(CAMERA_CS, OUTPUT); digitalWrite(CAMERA_CS, HIGH);
     
     // Initialize modules
-    camera = initializeCamera(camera);
+    camera = initializeCamera(CAMERA_CS);
+
+    if (debug) {Serial.println("Exiting Setup");}
+
 }
 
 void loop() {
@@ -45,17 +56,13 @@ void loop() {
     // If a command is available, grab it
     if (Serial.available()) {
         command = Serial.readStringUntil('\n');
+        if (debug) {Serial.println("Received command: " + command);}
         subcommand = getTerm(command, 0);
         commandHandled = false;
     }
 
     // Alive or Dead commands
-    if (subcommand == "HIGH") {
-        digitalWrite(LED_BUILTIN, HIGH);
-        commandHandled = true;
-    }
-    else if (subcommand == "LOW") {
-        digitalWrite(LED_BUILTIN, LOW);
+    if (subcommand == "PING") {
         commandHandled = true;
     }
 
@@ -68,6 +75,19 @@ void loop() {
         }
         else if (subcommand == "RIGHT") {
             digitalWrite(RIGHT_ENABLE, HIGH);
+            commandHandled = true;
+        }
+    }
+
+    // Commands to enable/disable the drive trains
+    else if (subcommand == "DISABLE") {
+        subcommand = getTerm(command, 1);
+        if (subcommand == "LEFT") {
+            digitalWrite(LEFT_ENABLE, LOW);
+            commandHandled = true;
+        }
+        else if (subcommand == "RIGHT") {
+            digitalWrite(RIGHT_ENABLE, LOW);
             commandHandled = true;
         }
     }
@@ -119,31 +139,37 @@ void loop() {
     }
 
     // Camera commands
-    else if (command == "CAMERA") {
+    else if (subcommand == "CAMERA") {
         subcommand = getTerm(command, 1);
-        if      (subcommand == "CAPTURE") {capturePhoto = true;}
-        else if (subcommand == "SEND") {sendPhoto = true;}
+        if      (subcommand == "CAPTURE") {
+            capturePhoto = true;
+            commandHandled = true;
+        }
+        else if (subcommand == "SEND") {
+            sendPhoto = true;
+            commandHandled = true;
+        }
     }
-
-    // Execute commands
-    doDrive(rightDriveStartTime, rightDriveDuration, rightDriveDirection, RIGHT_DRIVE_1, RIGHT_DRIVE_2);
-    doDrive(leftDriveStartTime, leftDriveDuration, leftDriveDirection, LEFT_DRIVE_1, LEFT_DRIVE_2);
-    doCameraCapture(capturePhoto, camera);
-    doCameraSend(_capturedPhoto, sendPhoto, camera);
 
     // Log the results
     if (command != "") {
         bool stateValid = checkState(leftDriveDuration, rightDriveDuration, leftDriveDirection, rightDriveDirection);
-        if (commandHandled && !stateValid) {Serial.println("COMMAND RECEIVED");}
+        if (commandHandled && !stateValid) {Serial.println("COMMAND REJECTED");}
         else if (commandHandled && stateValid) {Serial.println("COMMAND ACCEPTED");}
         else {Serial.println("COMMAND NOT FOUND");}
     }
+        
+    // Execute all processes
+    doDrive(rightDriveStartTime, rightDriveDuration, rightDriveDirection, RIGHT_DRIVE_1, RIGHT_DRIVE_2);
+    doDrive(leftDriveStartTime, leftDriveDuration, leftDriveDirection, LEFT_DRIVE_1, LEFT_DRIVE_2);
+    doCameraCapture(capturePhoto, camera);
+    doCameraSend(sendPhoto, camera);
     
     // Update state variables
     capturePhoto = false;
     sendPhoto = false;
-    _capturedPhoto = updateCameraCaptured(camera);
     command = "";
     subcommand = "";
+
 }
 

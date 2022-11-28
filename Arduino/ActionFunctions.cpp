@@ -19,8 +19,8 @@ bool doCameraCapture(bool capturePhoto, ArduCAM camera) {
   return true;
 }
 
-bool doCameraSend(bool _capturedPhoto, bool sendPhoto, ArduCAM camera) {
-  if (_capturedPhoto && sendPhoto) {
+bool doCameraSend(bool sendPhoto, ArduCAM camera) {
+  if (camera.get_bit(ARDUCHIP_TRIG, CAP_DONE_MASK) && sendPhoto) {
     readFifoBurst(camera);
     camera.clear_fifo_flag();
     return true;
