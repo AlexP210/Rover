@@ -27,3 +27,12 @@ bool doCameraSend(bool sendPhoto, ArduCAM camera) {
   }
   return false;
 }
+
+bool doTestCameraSPI(bool testSPI, ArduCAM camera) {
+  //Check if the ArduCAM SPI bus is OK
+  if (testSPI) {
+    camera.write_reg(ARDUCHIP_TEST1, 0x55);
+    Serial.println(camera.read_reg(ARDUCHIP_TEST1));
+    return camera.read_reg(ARDUCHIP_TEST1) == 0x55;
+  }
+}

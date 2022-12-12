@@ -13,12 +13,14 @@ const int LEFT_DRIVE_2 = 6;
 const int RIGHT_DRIVE_1 = 9;
 const int RIGHT_DRIVE_2 = 10;
 const int CAMERA_CS = 7;
+const int TEST_VOLTAGE = A0;
 
 // State variables
 float leftDriveStartTime; float leftDriveDuration; int leftDriveDirection;
 float rightDriveStartTime; float rightDriveDuration; int rightDriveDirection;
 ArduCAM camera;
 bool capturePhoto; bool _capturedPhoto; bool sendPhoto;
+bool testSPI;
 
 // Command handling
 String command;
@@ -29,23 +31,35 @@ void setup() {
     
     if (debug) {Serial.println("Entering Setup");}
 
-    // Open the communication lines
-    Serial.begin(9600);
-    SPI.begin();
-    Wire.begin();
-
     // Configure output pins
-    pinMode(LED_BUILTIN, OUTPUT); digitalWrite(LED_BUILTIN, LOW);
     pinMode(LEFT_ENABLE, OUTPUT); digitalWrite(LEFT_ENABLE, LOW);
     pinMode(RIGHT_ENABLE, OUTPUT); digitalWrite(RIGHT_ENABLE, LOW);
     pinMode(LEFT_DRIVE_1, OUTPUT); digitalWrite(LEFT_DRIVE_1, LOW);
     pinMode(LEFT_DRIVE_2, OUTPUT); digitalWrite(LEFT_DRIVE_2, LOW);
     pinMode(RIGHT_DRIVE_1, OUTPUT); digitalWrite(RIGHT_DRIVE_1, LOW);
     pinMode(RIGHT_DRIVE_2, OUTPUT); digitalWrite(RIGHT_DRIVE_2, LOW);
-    pinMode(CAMERA_CS, OUTPUT); digitalWrite(CAMERA_CS, HIGH);
+    // pinMode(CAMERA_CS, OUTPUT); digitalWrite(CAMERA_CS, HIGH);
+
+    // Configure input pins
+    pinMode(TEST_VOLTAGE, INPUT);
+
+    // Open the communication lines
+    Serial.begin(9600);
+    SPI.begin();
+    Wire.begin();
     
     // Initialize modules
-    camera = initializeCamera(CAMERA_CS);
+    // camera = initializeCamera(CAMERA_CS);
+    ArduCAM camera(OV2640, CAMERA_CS);
+    camera.write_reg(0x07, 0x80);
+    delay(100);
+    camera.write_reg(0x07, 0x00);
+    delay(100);
+    camera.set_format(JPEG);
+    camera.InitCAM();
+    camera.OV2640_set_JPEG_size(OV2640_320x240);
+    delay(1000);
+    camera.clear_fifo_flag();
 
     if (debug) {Serial.println("Exiting Setup");}
 
@@ -150,24 +164,38 @@ void loop() {
             commandHandled = true;
         }
     }
+    // Test commands
+    else if (subcommand == "TEST") {
+        subcommand = getTerm(command, 1);
+        if (subcommand == "SPI") {
+            testSPI = true;
+            commandHandled = true;
+        }
+        else if (subcommand == "VOLTAGE") {
+            Serial.println(analogRead(TEST_VOLTAGE)/1024.0 * 5.0);
+            commandHandled = true;
+        }
+    }
 
     // Log the results
     if (command != "") {
-        bool stateValid = checkState(leftDriveDuration, rightDriveDuration, leftDriveDirection, rightDriveDirection);
+        bool stateValid = checkState(leftDriveDuration, rightDriveDuration, leftDriveDirection, rightDriveDirection, sendPhoto, camera);
         if (commandHandled && !stateValid) {Serial.println("COMMAND REJECTED");}
         else if (commandHandled && stateValid) {Serial.println("COMMAND ACCEPTED");}
         else {Serial.println("COMMAND NOT FOUND");}
     }
-        
+
     // Execute all processes
     doDrive(rightDriveStartTime, rightDriveDuration, rightDriveDirection, RIGHT_DRIVE_1, RIGHT_DRIVE_2);
     doDrive(leftDriveStartTime, leftDriveDuration, leftDriveDirection, LEFT_DRIVE_1, LEFT_DRIVE_2);
     doCameraCapture(capturePhoto, camera);
     doCameraSend(sendPhoto, camera);
+    doTestCameraSPI(testSPI, camera);
     
     // Update state variables
     capturePhoto = false;
     sendPhoto = false;
+    testSPI = false;
     command = "";
     subcommand = "";
 

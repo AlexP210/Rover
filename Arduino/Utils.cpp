@@ -52,10 +52,11 @@ String getTerm(String command, int index) {
 }
 
 // State checker
-bool checkState(int leftDriveDuration, int rightDriveDuration, int leftDriveDirection, int rightDriveDirection) {
+bool checkState(int leftDriveDuration, int rightDriveDuration, int leftDriveDirection, int rightDriveDirection, bool sendPhoto, ArduCAM camera) {
     if (!(leftDriveDuration >= 0 || rightDriveDuration >= 0)) {return false;}
     if (!(leftDriveDirection == 1 || leftDriveDirection == -1 || leftDriveDirection == 0)) {return false;}
     if (!(rightDriveDirection == 1 || rightDriveDirection == -1 || rightDriveDirection == 0)) {return false;}
+    if (!camera.get_bit(ARDUCHIP_TRIG, CAP_DONE_MASK) && sendPhoto) {return false;}
     return true;
 }
 
