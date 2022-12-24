@@ -36,3 +36,17 @@ bool doTestCameraSPI(bool testSPI, ArduCAM camera) {
     return camera.read_reg(ARDUCHIP_TEST1) == 0x55;
   }
 }
+
+bool doRangeFinderReading(float rangeFinderTriggerStartTime, 
+                          bool lastRangeFinderPulseState, float rangeFinderPulseStartTime, float rangeFinderPulseEndTime, 
+                          bool rangeFinderReadingReady,
+                          int RANGEFINDER_TRIG, int RANGEFINDER_OUT) {
+  // if we're less than 0.1 us after issuing the command, hold the RANGEFINDER_TRIG pin high to trigger a pulse
+  if (rangeFinderTriggerStartTime > 0 && millis() - rangeFinderTriggerStartTime <= 0.01) {
+    digitalWrite(RANGEFINDER_TRIG, HIGH);
+  }
+  // Otherwise keep it low
+  else {
+    digitalWrite(RANGEFINDER_TRIG, LOW);
+  }
+}

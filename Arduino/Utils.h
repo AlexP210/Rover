@@ -5,6 +5,6 @@ bool readFifoBurst(ArduCAM camera);
 
 String getTerm(String command, int index);
 
-bool checkState(int leftDriveDuration, int rightDriveDuration, int leftDriveDirection, int rightDriveDirection, bool sendPhoto, ArduCAM camera);
+bool checkState(int leftDriveDuration, int rightDriveDuration, int leftDriveDirection, int rightDriveDirection);
 
 ArduCAM initializeCamera(int CAMERA_CS);

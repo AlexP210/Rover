@@ -1,5 +1,4 @@
 #include "ActionFunctions.h"
-#include "UpdateFunctions.h"
 #include "Utils.h"
 
 // Debug flag
@@ -12,15 +11,17 @@ const int LEFT_DRIVE_1 = 5;
 const int LEFT_DRIVE_2 = 6;
 const int RIGHT_DRIVE_1 = 9;
 const int RIGHT_DRIVE_2 = 10;
-const int CAMERA_CS = 7;
+const int RANGEFINDER_TRIG = 11;
+const int RANGEFINDER_OUT = 12;
 const int TEST_VOLTAGE = A0;
 
 // State variables
 float leftDriveStartTime; float leftDriveDuration; int leftDriveDirection;
 float rightDriveStartTime; float rightDriveDuration; int rightDriveDirection;
-ArduCAM camera;
-bool capturePhoto; bool _capturedPhoto; bool sendPhoto;
-bool testSPI;
+float rangeFinderTriggerStartTime; 
+float lastRangeFinderPulseState; float currentRangeFinderPulseState;
+float rangeFinderPulseStartTime; float rangeFinderPulseEndTime;
+bool rangeFinderReadingReady;
 
 // Command handling
 String command;
@@ -38,31 +39,17 @@ void setup() {
     pinMode(LEFT_DRIVE_2, OUTPUT); digitalWrite(LEFT_DRIVE_2, LOW);
     pinMode(RIGHT_DRIVE_1, OUTPUT); digitalWrite(RIGHT_DRIVE_1, LOW);
     pinMode(RIGHT_DRIVE_2, OUTPUT); digitalWrite(RIGHT_DRIVE_2, LOW);
-    // pinMode(CAMERA_CS, OUTPUT); digitalWrite(CAMERA_CS, HIGH);
+    pinMode(RANGEFINDER_TRIG, OUTPUT);
 
     // Configure input pins
     pinMode(TEST_VOLTAGE, INPUT);
+    pinMode(RANGEFINDER_OUT, INPUT);
 
     // Open the communication lines
     Serial.begin(9600);
-    SPI.begin();
-    Wire.begin();
-    
-    // Initialize modules
-    // camera = initializeCamera(CAMERA_CS);
-    ArduCAM camera(OV2640, CAMERA_CS);
-    camera.write_reg(0x07, 0x80);
-    delay(100);
-    camera.write_reg(0x07, 0x00);
-    delay(100);
-    camera.set_format(JPEG);
-    camera.InitCAM();
-    camera.OV2640_set_JPEG_size(OV2640_320x240);
-    delay(1000);
-    camera.clear_fifo_flag();
 
+    // Log successful completion of setup
     if (debug) {Serial.println("Exiting Setup");}
-
 }
 
 void loop() {
@@ -74,7 +61,6 @@ void loop() {
         subcommand = getTerm(command, 0);
         commandHandled = false;
     }
-
     // Alive or Dead commands
     if (subcommand == "PING") {
         commandHandled = true;
@@ -152,26 +138,30 @@ void loop() {
         }
     }
 
-    // Camera commands
-    else if (subcommand == "CAMERA") {
+    // Rangefinder commands
+    else if (subcommand == "RANGE") {
         subcommand = getTerm(command, 1);
-        if      (subcommand == "CAPTURE") {
-            capturePhoto = true;
+        if (subcommand == "MEASURE") {
+            rangeFinderTriggerStartTime = millis();
             commandHandled = true;
         }
-        else if (subcommand == "SEND") {
-            sendPhoto = true;
+        else if (subcommand == "READ") {
+            if (rangeFinderReadingReady) {
+                Serial.println((rangeFinderPulseEndTime - rangeFinderPulseStartTime)/1000.0 * 343.0 / 2);
+                rangeFinderReadingReady = false;
+                rangeFinderTriggerStartTime = 0;
+            }
+            else {
+                Serial.println("NOT READY");
+            }
             commandHandled = true;
         }
     }
+
     // Test commands
     else if (subcommand == "TEST") {
         subcommand = getTerm(command, 1);
-        if (subcommand == "SPI") {
-            testSPI = true;
-            commandHandled = true;
-        }
-        else if (subcommand == "VOLTAGE") {
+        if (subcommand == "VOLTAGE") {
             Serial.println(analogRead(TEST_VOLTAGE)/1024.0 * 5.0);
             commandHandled = true;
         }
@@ -179,7 +169,7 @@ void loop() {
 
     // Log the results
     if (command != "") {
-        bool stateValid = checkState(leftDriveDuration, rightDriveDuration, leftDriveDirection, rightDriveDirection, sendPhoto, camera);
+        bool stateValid = checkState(leftDriveDuration, rightDriveDuration, leftDriveDirection, rightDriveDirection);
         if (commandHandled && !stateValid) {Serial.println("COMMAND REJECTED");}
         else if (commandHandled && stateValid) {Serial.println("COMMAND ACCEPTED");}
         else {Serial.println("COMMAND NOT FOUND");}
@@ -188,16 +178,28 @@ void loop() {
     // Execute all processes
     doDrive(rightDriveStartTime, rightDriveDuration, rightDriveDirection, RIGHT_DRIVE_1, RIGHT_DRIVE_2);
     doDrive(leftDriveStartTime, leftDriveDuration, leftDriveDirection, LEFT_DRIVE_1, LEFT_DRIVE_2);
-    doCameraCapture(capturePhoto, camera);
-    doCameraSend(sendPhoto, camera);
-    doTestCameraSPI(testSPI, camera);
+    doRangeFinderReading(rangeFinderTriggerStartTime, 
+                         lastRangeFinderPulseState, rangeFinderPulseStartTime, rangeFinderPulseEndTime,
+                         rangeFinderReadingReady,
+                         RANGEFINDER_TRIG, RANGEFINDER_OUT);
+    
     
     // Update state variables
-    capturePhoto = false;
-    sendPhoto = false;
-    testSPI = false;
     command = "";
     subcommand = "";
+    // If we're on the rising edge of the pulse, then log the start time of the pulse
+    currentRangeFinderPulseState = digitalRead(RANGEFINDER_OUT);
+    // Serial.println(currentRangeFinderPulseState);
+    if (currentRangeFinderPulseState == HIGH && lastRangeFinderPulseState == LOW) {
+        rangeFinderPulseStartTime = millis();
+    }
+    // If it's the falling edge of the pulse, then set the end time, the ready flag, and re-set the last state. Return
+    else if (currentRangeFinderPulseState == LOW && lastRangeFinderPulseState == HIGH) {
+        rangeFinderPulseEndTime = millis();
+        rangeFinderReadingReady = true;
+    }
+    // If we get here, then reading is not finished; set the state
+    lastRangeFinderPulseState = currentRangeFinderPulseState;
 
 }
 
