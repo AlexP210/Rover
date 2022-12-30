@@ -16,16 +16,12 @@ class RoverClient:
         try: self.esp.send(command.encode())
         except: pass
         time.sleep(1)
-    
-    def receive(self):
-        try: 
-            data = self.esp.recv(1024).decode().strip()
-            return data
+        try: return self.esp.recv(1024).decode().strip()
         except BlockingIOError: return ":BLOCKING ERROR:"
         except UnicodeDecodeError: return ":DECODE ERROR:"
-
+    
 if __name__ == "__main__":
     client = RoverClient()
     while True:
-        client.send(input("Enter Command: "))
-        print("Reponse: " + client.receive())
+        response = client.send(input("Enter Command: "))
+        print("Reponse: " + response)

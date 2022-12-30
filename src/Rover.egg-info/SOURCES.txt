@@ -1,0 +1,8 @@
+README.md
+pyproject.toml
+src/Rover/Client.py
+src/Rover/__init__.py
+src/Rover.egg-info/PKG-INFO
+src/Rover.egg-info/SOURCES.txt
+src/Rover.egg-info/dependency_links.txt
+src/Rover.egg-info/top_level.txt

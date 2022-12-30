@@ -1,0 +1,15 @@
+Metadata-Version: 2.1
+Name: Rover
+Version: 0.0.1
+Summary: A package to add Rover functionality to a project
+Author-email: Alex Pleava <alex.pleava@gmail.com>
+Project-URL: Homepage, https://github.com/AlexP210/Rover
+Project-URL: Bug Tracker, https://github.com/AlexP210/Rover/issues
+Classifier: Programming Language :: Python :: 3
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Operating System :: OS Independent
+Requires-Python: >=3.7
+Description-Content-Type: text/markdown
+
+# Rover
+A project to learn about IoT, computer vision and robotics by building a WiFi-controlled rover 
