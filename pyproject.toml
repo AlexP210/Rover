@@ -1,0 +1,22 @@
+[project]
+name = "Rover"
+version = "0.0.1"
+authors = [
+  { name="Alex Pleava", email="alex.pleava@gmail.com" },
+]
+description = "A package to add Rover functionality to a project"
+readme = "README.md"
+requires-python = ">=3.7"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+
+[project.urls]
+"Homepage" = "https://github.com/AlexP210/Rover"
+"Bug Tracker" = "https://github.com/AlexP210/Rover/issues"
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
