@@ -2,13 +2,31 @@
 #include "Utils.h"
 
 bool doDrive(float driveStartTime, float driveDuration, int direction, int drivePin1, int drivePin2) {
-    int highPin;
-    int lowPin;
-    if (direction == 1) {highPin = drivePin1; lowPin = drivePin2;}
-    else if (direction == -1) {highPin = drivePin2; lowPin = drivePin1;}
-    // drive if within the time range
-    if (millis() - driveStartTime <= driveDuration*1000) {analogWrite(highPin, 250);analogWrite(lowPin, 0);}
-    else {analogWrite(drivePin1, LOW);analogWrite(drivePin2, LOW);}
+    // If we're within the driving window, calculate what voltage to write
+    // Serial.println(millis() - driveStartTime <= driveDuration);
+    if (millis() - driveStartTime <= driveDuration) {
+      // Which pin gets the high voltage
+      int highPin = drivePin1;
+      int lowPin = drivePin2;
+      if (direction == 1) {highPin = drivePin1; lowPin = drivePin2;}
+      else if (direction == -1) {highPin = drivePin2; lowPin = drivePin1;}
+      // The "high voltage" we place on the motor pin should ramp up/down over 5s to get reasonnable acceleration and prevent stalls
+      float time = millis();
+      float timeSinceDriveStartTime = max(time - driveStartTime, 0);
+      float driveEndTime = driveStartTime + driveDuration;
+      float timeToDriveEndTime = max(driveEndTime - time, 0);
+      int highVoltageCounts = 0;
+      // If we're before half, ramp up with slope 255 counts / 1 second; otherwise ramp down with the same slope
+      if (timeSinceDriveStartTime < timeToDriveEndTime) {highVoltageCounts = (int)(255.0/1.0 * timeSinceDriveStartTime / 1000.0);}
+      else if (timeSinceDriveStartTime >= timeToDriveEndTime) {highVoltageCounts = (int)(255.0/1.0 * timeToDriveEndTime / 1000.0);}
+      // Cap it at 255
+      highVoltageCounts = min(highVoltageCounts, 255);
+      analogWrite(highPin, 255); 
+      analogWrite(lowPin, 0);
+    }
+    else {
+      analogWrite(drivePin1, 0); 
+      analogWrite(drivePin2, 0);}
 }
 
 // Ask the arducam to take a picture
@@ -49,4 +67,12 @@ bool doRangeFinderReading(float rangeFinderTriggerStartTime,
   else {
     digitalWrite(RANGEFINDER_TRIG, LOW);
   }
+}
+
+bool doServo(Servo servo, float servoAngle) {
+  servo.write(servoAngle);
+}
+
+bool doReset(int RESET, bool resetFlag) {
+  if (resetFlag) {digitalWrite(RESET, LOW);}
 }

@@ -4,21 +4,28 @@ import select
 import sys
 import time
 
-esp = socket.socket()
+class RoverClient:
+    def __init__(self):
+        self.esp = socket.socket()
+        self.port = 5000
+        self.ip = "192.168.2.28"
+        self.esp.connect((self.ip, self.port))
+        self.esp.setblocking(0)
 
-port = 5000
-ip = "169.254.158.250"
-# ip = "192.168.2.28"
+    def send(self, command):
+        try: self.esp.send(command.encode())
+        except: pass
+        time.sleep(1)
+    
+    def receive(self):
+        try: 
+            data = self.esp.recv(1024).decode().strip()
+            return data
+        except BlockingIOError: return ":BLOCKING ERROR:"
+        except UnicodeDecodeError: return ":DECODE ERROR:"
 
-# ip = "192.168.1.13"
-
-esp.connect((ip, port))
-esp.setblocking(0)
-
-while True:
-    try: data = print(esp.recv(1024).decode().strip())
-    except BlockingIOError: pass
-    msg = input("Enter message: ") + "\n"
-    try: esp.send(msg.encode())
-    except: pass
-    time.sleep(1)
+if __name__ == "__main__":
+    client = RoverClient()
+    while True:
+        client.send(input("Enter Command: "))
+        print("Reponse: " + client.receive())

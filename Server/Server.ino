@@ -13,6 +13,7 @@
 #ifndef STASSID
 #define STASSID "BELL129"
 #define STAPSK  "52A311925213"
+
 // #define STASSID "NETGEAR30"
 // #define STAPSK  "huynhdam2022"
 
@@ -20,6 +21,11 @@
 
 const char* ssid     = STASSID;
 const char* password = STAPSK;
+
+// Specify wifi configurations
+IPAddress local_IP(192, 168, 2, 28);
+IPAddress gateway(192, 168, 2, 1);
+IPAddress subnet(255, 255, 255, 0);
 
 // Create an instance of the server, specify the port to listen on as an argument
 WiFiServer esp(5000);
@@ -77,6 +83,11 @@ void setup() {
   // Prepare class variables
   lastBlinkTime = millis();
 
+  // Configure static IP address
+  if (!WiFi.config(local_IP, gateway, subnet)) {
+    Serial.println("STA Failed to configure");
+  }
+
   // Initiate WiFi connection
   connectToWiFI(ssid, password, false, true);
 }
@@ -110,6 +121,7 @@ void loop() {
         if (fromKerbal.indexOf("ESP: ") != -1) {
           espCommand = fromKerbal.substring(6);
           if (espCommand == "DEBUG") {debug = !debug;}
+          if (espCommand == "IP") {kerbal.println(espIP);}
         }
         else {Serial.println(fromKerbal);}
       }
@@ -119,6 +131,11 @@ void loop() {
         fromArduino = Serial.readStringUntil('\n');
         while (Serial.available()) {Serial.read();};
         if (debug) Serial.println("ESP Received from Arduino: " + fromArduino);
+        if (fromArduino.indexOf("ESP: ") != -1) {
+          espCommand = fromArduino.substring(6);
+          if (espCommand == "DEBUG") {debug = !debug;}
+          if (espCommand == "IP") {Serial.println(espIP);}
+        }
         kerbal.println(fromArduino);
       }
     }
