@@ -13,11 +13,15 @@
 #ifndef STASSID
 #define STASSID "BELL129"
 #define STAPSK  "52A311925213"
+#define TERMINATION_CHARARCTER '|'
 
 // #define STASSID "NETGEAR30"
 // #define STAPSK  "huynhdam2022"
 
 #endif
+
+// flag for debugging outputs
+bool debug = false;
 
 const char* ssid     = STASSID;
 const char* password = STAPSK;
@@ -69,8 +73,6 @@ bool getKerbalConnectionStatus() {
   return kerbal.connected();
 }
 
-// flag for debugging outputs
-bool debug = false;
 
 void setup() {
   // Start the serial ports
@@ -103,7 +105,6 @@ void loop() {
       espIP = WiFi.localIP();
       if (debug) {Serial.print("Server started at: "); Serial.println(espIP);};
     }
-
     // If client not connected, try connecting
     else if (!kerbal.connected()) {
       kerbal = esp.available();
@@ -114,29 +115,30 @@ void loop() {
 
       // Read from kerbal if there is anything available, and send it to arduino
       if (kerbal.available()) {
-        fromKerbal = kerbal.readStringUntil('\n');
-        while (kerbal.available()) {kerbal.read();}
-        if (debug) Serial.println("ESP Received from Kerbal: " + fromKerbal);
-        // check if it's meant for the esp
-        if (fromKerbal.indexOf("ESP: ") != -1) {
-          espCommand = fromKerbal.substring(6);
-          if (espCommand == "DEBUG") {debug = !debug;}
-          if (espCommand == "IP") {kerbal.println(espIP);}
+        char c = kerbal.read();
+        if (c != TERMINATION_CHARARCTER) {fromKerbal += c;}
+        else {
+          if (debug) Serial.println("ESP Received from Kerbal: " + fromKerbal);
+          if (debug) kerbal.println("ESP Received from Kerbal: " + fromKerbal);
+          if (fromKerbal.substring(0, 5) == "ESP: ") {
+            String espCommand = fromKerbal.substring(5);
+            if (espCommand == "DEBUG") {debug != debug;}
+          }
+          else {Serial.println(fromKerbal);}
+          fromKerbal = "";
         }
-        else {Serial.println(fromKerbal);}
       }
 
       // If we get a response from the Arduino, then send it to kerbal
       if (Serial.available()) {
-        fromArduino = Serial.readStringUntil('\n');
-        while (Serial.available()) {Serial.read();};
-        if (debug) Serial.println("ESP Received from Arduino: " + fromArduino);
-        if (fromArduino.indexOf("ESP: ") != -1) {
-          espCommand = fromArduino.substring(6);
-          if (espCommand == "DEBUG") {debug = !debug;}
-          if (espCommand == "IP") {Serial.println(espIP);}
+        char c = Serial.read();
+        if (c != TERMINATION_CHARARCTER) {fromArduino += c;}
+        else {
+          if (debug) Serial.println("ESP Received from Arduino: " + fromArduino);
+          if (debug) kerbal.println("ESP Received from Kerbal: " + fromKerbal);
+          kerbal.println(fromArduino);
+          fromArduino = "";
         }
-        kerbal.println(fromArduino);
       }
     }
   }

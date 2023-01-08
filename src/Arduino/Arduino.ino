@@ -21,11 +21,16 @@ const int TEST_VOLTAGE = A0;
 // State variables
 float leftDriveStartTime = 0; float leftDriveDuration = 0; int leftDriveDirection = 0;
 float rightDriveStartTime = 0; float rightDriveDuration = 0; int rightDriveDirection = 0;
+
 float rangeFinderTriggerStartTime = 0; 
 float lastRangeFinderPulseState = 0; float currentRangeFinderPulseState = 0;
 float rangeFinderPulseStartTime = 0; float rangeFinderPulseEndTime = 0;
-bool rangeFinderReadingReady = false; 
-float servoAngle = 90; bool servoSweeping = false; float servoSweepStart = 90; float servoSweepEnd = 90; float servoSweepStep = 0;
+bool rangeFinderReadingReady = false; bool readingRange = false;
+
+int servoAngle = 90; float lastServoCommandTime;
+bool servoSweeping = false; float servoSweepStart = 90; float servoSweepEnd = 90; float servoSweepStep = 0;
+float servoSweepData[180]; bool servoSweepDataReady;
+
 bool ledState = false;
 
 // Objects
@@ -35,6 +40,7 @@ Servo servo;
 String command = "";
 String subcommand = "";
 bool commandHandled = false;
+String response = "";
 
 void setup() {
     
@@ -78,32 +84,6 @@ void loop() {
     // Alive or Dead commands
     if (subcommand == "PING") {
         commandHandled = true;
-    }
-
-    // Commands to enable/disable the drive trains
-    else if (subcommand == "ENABLE") {
-        subcommand = getTerm(command, 1);
-        if (subcommand == "LEFT") {
-            digitalWrite(LEFT_ENABLE, HIGH);
-            commandHandled = true;
-        }
-        else if (subcommand == "RIGHT") {
-            digitalWrite(RIGHT_ENABLE, HIGH);
-            commandHandled = true;
-        }
-    }
-
-    // Commands to enable/disable the drive trains
-    else if (subcommand == "DISABLE") {
-        subcommand = getTerm(command, 1);
-        if (subcommand == "LEFT") {
-            digitalWrite(LEFT_ENABLE, LOW);
-            commandHandled = true;
-        }
-        else if (subcommand == "RIGHT") {
-            digitalWrite(RIGHT_ENABLE, LOW);
-            commandHandled = true;
-        }
     }
 
     // Commands to drive
@@ -150,6 +130,35 @@ void loop() {
                 commandHandled = true;
             }
         }
+        // Commands to enable/disable the drive trains
+        else if (subcommand == "ENABLE") {
+            subcommand = getTerm(command, 2);
+            if (subcommand == "LEFT") {
+                digitalWrite(LEFT_ENABLE, HIGH);
+                Serial.print("<LOG>ENABLE LEFT: ENABLED|");
+                commandHandled = true;
+            }
+            else if (subcommand == "RIGHT") {
+                digitalWrite(RIGHT_ENABLE, HIGH);
+                Serial.print("<LOG>ENABLE RIGHT: ENABLED|");
+                commandHandled = true;
+            }
+        }
+
+        // Commands to enable/disable the drive trains
+        else if (subcommand == "DISABLE") {
+            subcommand = getTerm(command, 2);
+            if (subcommand == "LEFT") {
+                digitalWrite(LEFT_ENABLE, LOW);
+                response = "<LOG>DISABLE LEFT: DISABLED|";
+                commandHandled = true;
+            }
+            else if (subcommand == "RIGHT") {
+                digitalWrite(RIGHT_ENABLE, LOW);
+                response = "<LOG>DISABLE RIGHT: DISABLED|";
+                commandHandled = true;
+            }
+        }
     }
 
     // Rangefinder commands
@@ -157,16 +166,18 @@ void loop() {
         subcommand = getTerm(command, 1);
         if (subcommand == "MEASURE") {
             rangeFinderTriggerStartTime = millis();
+            readingRange = true;
             commandHandled = true;
         }
         else if (subcommand == "READ") {
             if (rangeFinderReadingReady) {
                 Serial.println((rangeFinderPulseEndTime - rangeFinderPulseStartTime)/1000.0 * 343.0 / 2);
                 rangeFinderReadingReady = false;
+                readingRange = false;
                 rangeFinderTriggerStartTime = 0;
             }
             else {
-                Serial.println("NOT READY");
+                Serial.println("<LOG>RANGE READ: NOT READY|");
             }
             commandHandled = true;
         }
@@ -188,18 +199,36 @@ void loop() {
 
     else if (subcommand == "SERVO") {
         subcommand = getTerm(command, 1);
-        if (subcommand = "SET") {
-            servoAngle = getTerm(command, 2).toFloat();
-            commandHandled = true;
+        if (subcommand == "SET") {
+            if (!servoSweeping) {
+                servoAngle = getTerm(command, 2).toFloat();
+                lastServoCommandTime = millis();
+                commandHandled = true;
+            }
+            else {
+                Serial.println("SERVO IS SWEEPING|");
+            }
         }
-        else if (subcommand = "SWEEP") {
-            servoSweeping = true;
-            servoSweepStart = max(getTerm(command, 2).toFloat(), 15);
-            servoAngle = servoSweepStart;
-            servoSweepEnd = getTerm(command, 3).toFloat();
-            servoSweepStep = getTerm(command, 4).toFloat();
-            rangeFinderTriggerStartTime = millis();
-            commandHandled = true;
+        else if (subcommand == "SWEEP") {
+            subcommand = getTerm(command, 2);
+            if (subcommand == "MEASURE") {
+                servoSweeping = true;
+                servoSweepStart = max(getTerm(command, 3).toFloat(), 15);
+                servoSweepEnd = min(getTerm(command, 4).toFloat(), 175);
+                servoSweepStep = getTerm(command, 5).toFloat();         
+                servoAngle = servoSweepStart;
+                lastServoCommandTime = millis();
+                commandHandled = true;
+            }
+            else if (subcommand == "READ") {
+                for (int i = 0; i < 180; i++) {
+                    Serial.print(servoSweepData[i]); Serial.print(", ");
+                }
+                Serial.println("");
+                servoSweeping = false;
+                servoSweepDataReady = false;
+                commandHandled = true;
+            }
         }
 
     }
@@ -207,9 +236,9 @@ void loop() {
     // Log the results
     if (command != "") {
         bool stateValid = checkState(leftDriveDuration, rightDriveDuration, leftDriveDirection, rightDriveDirection);
-        if (commandHandled && !stateValid) {Serial.println("COMMAND REJECTED");}
-        else if (commandHandled && stateValid) {Serial.println("COMMAND ACCEPTED");}
-        else {Serial.println("COMMAND NOT FOUND");}
+        if (commandHandled && !stateValid) {Serial.println("<ACK>COMMAND REJECTED|");}
+        else if (commandHandled && stateValid) {Serial.println("<ACK>COMMAND ACCEPTED|");}
+        else {Serial.println("<ACK>COMMAND NOT FOUND|");}
     }
 
     // Execute all processes
@@ -224,30 +253,57 @@ void loop() {
     // Update state variables
     command = "";
     subcommand = "";
-    // If we're on the rising edge of the pulse, then log the start time of the pulse
-    currentRangeFinderPulseState = digitalRead(RANGEFINDER_OUT);
-    // Serial.println(currentRangeFinderPulseState);
-    if (currentRangeFinderPulseState == HIGH && lastRangeFinderPulseState == LOW) {
-        rangeFinderPulseStartTime = millis();
-    }
-    // If it's the falling edge of the pulse, then set the end time, the ready flag, and re-set the last state. Return
-    else if (currentRangeFinderPulseState == LOW && lastRangeFinderPulseState == HIGH) {
-        rangeFinderPulseEndTime = millis();
-        rangeFinderReadingReady = true;
-    }
-    // If we get here, then reading is not finished; set the state
-    lastRangeFinderPulseState = currentRangeFinderPulseState;
 
+    /* If we're in the middle of a range reading, then do the following:
+        1. Get the current pulse state
+        2. Compare it to the last pulse state to find the start and end of the pulse
+        3. If we found te tail end of the pulse, then set the flag that the reading is ready */
+    if (readingRange) {
+        currentRangeFinderPulseState = digitalRead(RANGEFINDER_OUT);
+        if (currentRangeFinderPulseState == HIGH && lastRangeFinderPulseState == LOW) {
+            rangeFinderPulseStartTime = millis();
+        }
+        else if (currentRangeFinderPulseState == LOW && lastRangeFinderPulseState == HIGH) {
+            rangeFinderPulseEndTime = millis();
+            rangeFinderReadingReady = true;
+        }
+        lastRangeFinderPulseState = currentRangeFinderPulseState;
+    }
 
-    // // Update the servo sweep angle
-    // if (rangeFinderReadingReady && servoSweeping && servoAngle + servoSweepStep <= servoSweepEnd) {
-    //     // Report the last value
-    //     Serial.println((rangeFinderPulseEndTime - rangeFinderPulseStartTime)/1000.0 * 343.0 / 2);
-    //     rangeFinderReadingReady = false;
-    //     rangeFinderTriggerStartTime = 0;
-    //     servoAngle += servoSweepStep;
-    //     rangeFinderTriggerStartTime = millis();
-    // }
+    /* If we're in the middle of a servo sweep, do the following:
+        1. If we're done sweeping, do nothing.
+        1. If it's been < 1 s since the last servo command, do nothing
+        2. If it's been < 1 s AND we're not range reading, then start the range reading.
+        3. If it's been > 1 s AND we are range reading AND the result is not ready, do nothing
+        4. If it's been > 1 s AND we are range reading AND the result is ready, add the result to the array and update the angle.*/
+    if (servoSweeping) {
+        if (millis() - lastServoCommandTime < 1000 || servoSweepDataReady) {
+            ;
+        }
+        else if (!readingRange) {
+            rangeFinderTriggerStartTime = millis();
+            readingRange = true;
+            Serial.println("Starting new reading");
+        }
+        else if (!rangeFinderReadingReady) {
+            ;
+        }
+        else {
+            servoSweepData[servoAngle] = (rangeFinderPulseEndTime - rangeFinderPulseStartTime)/1000.0 * 343.0 / 2;
+            rangeFinderReadingReady = false;
+            readingRange = false;
+            rangeFinderTriggerStartTime = 0;
+
+            if (servoAngle < servoSweepEnd) {
+                servoAngle = servoAngle + servoSweepStep;
+                lastServoCommandTime = millis();
+            }
+            else if (servoAngle == servoSweepEnd) {
+                servoSweepDataReady = true;
+                servoAngle = 90;
+            }
+        }
+    }
 }
 
 
