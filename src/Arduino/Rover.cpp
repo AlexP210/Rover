@@ -89,6 +89,10 @@ float* Rover::getServoSweepData() {
     else {return nullptr;}
 }
 
+void Rover::led() {
+    ledState = !ledState;
+}
+
 
 String Rover::act() {
     // The response string
@@ -158,7 +162,8 @@ String Rover::act() {
             else if (currentRangeFinderPulseState == LOW && lastRangeFinderPulseState == HIGH) {
                 rangeFinderPulseEndTime = millis();
                 lastRangeReading = (rangeFinderPulseEndTime - rangeFinderPulseStartTime)/1000.0 * 343.0 / 2;
-                response += "RANGE MEASUREMENT DONE|RANGE MEASUREMENT = " + String(lastRangeReading)+"|";
+                response += "RANGE MEASUREMENT @ " + String(servoAngle) + " degrees: " = String(lastRangeReading)+ "|";
+                response += "RANGE MEASUREMENT DONE|";
                 readingRange = false;
                 rangeFinderTriggerStartTime = 0;
             }
@@ -200,7 +205,13 @@ String Rover::act() {
         else if (!servoSetting && !readingRange && rangeFinderReadingReady) {
             servoSweepData[servoAngle] = getSingleDistanceMeasurement();
             if (servoAngle < servoSweepEnd) {servoSet(servoAngle + servoSweepStep);}
-            else if (servoAngle == servoSweepEnd) {servoSweeping = false;}
+            else if (servoAngle == servoSweepEnd) {
+                servoSweepDataReady = true;
+                servoSweeping = false;
+                response += "SERVO SWEEP DONE|";
+            }
         }
     }
+
+    digitalWrite(LED_PIN, ledState);
 }

@@ -48,5 +48,6 @@ class Rover {
         void servoSet(float commandedServoAngle);
         void servoSweep(float commandedServoStartAngle, float commandedServoStopAngle, float commandedServoStepAngle);
         float* getServoSweepData();
+        void led();
         String act();
 };
