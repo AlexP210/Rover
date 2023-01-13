@@ -124,7 +124,7 @@ void loop() {
             String espCommand = fromKerbal.substring(5);
             if (espCommand == "DEBUG") {debug != debug;}
           }
-          else {Serial.println(fromKerbal);}
+          else {Serial.print(fromKerbal+"|");}
           fromKerbal = "";
         }
       }
@@ -136,7 +136,7 @@ void loop() {
         else {
           if (debug) Serial.println("ESP Received from Arduino: " + fromArduino);
           if (debug) kerbal.println("ESP Received from Kerbal: " + fromKerbal);
-          kerbal.println(fromArduino);
+          kerbal.print(fromArduino+"|");
           fromArduino = "";
         }
       }

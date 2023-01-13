@@ -47,8 +47,8 @@ bool readFifoBurst(ArduCAM camera)
 }
 
 String getTerm(String command, int index) {
-    if (index == 0) {return command.substring(0, command.indexOf(" "));}
-    else {return getTerm(command.substring(command.indexOf(" ")+1, command.length()), index - 1);}
+  if (index == 0) {return command.substring(0, command.indexOf(' '));}
+  else {return getTerm(command.substring(command.indexOf(' ')+1, command.length()), index - 1);}
 }
 
 // State checker

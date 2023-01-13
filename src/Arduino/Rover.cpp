@@ -1,6 +1,6 @@
 #include "Rover.h"
 
-Rover::Rover() {
+void Rover::setup() {
     // Configure output pins
     pinMode(LEFT_ENABLE_PIN, OUTPUT); digitalWrite(LEFT_ENABLE_PIN, LOW);
     pinMode(RIGHT_ENABLE_PIN, OUTPUT); digitalWrite(RIGHT_ENABLE_PIN, LOW);
@@ -10,13 +10,12 @@ Rover::Rover() {
     pinMode(RIGHT_DRIVE_2_PIN, OUTPUT); digitalWrite(RIGHT_DRIVE_2_PIN, LOW);
     pinMode(RANGEFINDER_TRIG_PIN, OUTPUT); digitalWrite(RIGHT_DRIVE_2_PIN, LOW);
     pinMode(LED_PIN, OUTPUT); digitalWrite(LED_PIN, LOW);
+    // pinMode(SERVO_CONTROL_PIN, OUTPUT); analogWrite(SERVO_CONTROL_PIN, 0);
     // Configure input pins
     pinMode(RANGEFINDER_OUT_PIN, INPUT);
     // Initialize sensor/actuator objects
     servo.attach(SERVO_CONTROL_PIN);
     servo.write(servoAngle);
-    // Open the communication lines
-    Serial.begin(9600);
 }
 
 void Rover::toggleDrive(bool state) {
@@ -45,8 +44,17 @@ void Rover::turn(int direction, float duration) {
     leftDriveStartTime = rightDriveStartTime = millis();
 }
 
-void Rover::stop() {
+void Rover::requestStopDrive() {
     requestDriveStop = true;
+}
+
+void Rover::stopDrive() {
+    rightDriveDirection = leftDriveDirection = 0;
+    rightDriveDuration = leftDriveDuration = 0;
+    digitalWrite(LEFT_DRIVE_1_PIN, LOW); digitalWrite(LEFT_DRIVE_2_PIN, LOW);
+    digitalWrite(RIGHT_DRIVE_1_PIN, LOW); digitalWrite(RIGHT_DRIVE_2_PIN, LOW);
+    driving = false;
+    requestDriveStop = false;
 }
 
 void Rover::safe() {
@@ -59,7 +67,6 @@ void Rover::safe() {
 void Rover::doSingleDistanceMeasurement() {
     readingRange = true;
     rangeFinderReadingReady = false;
-    rangeFinderTriggerStartTime = millis();
 }
 
 float Rover::getSingleDistanceMeasurement() {
@@ -71,22 +78,23 @@ void Rover::servoSet(float commandedServoAngle) {
     servoSetting = true;
     lastServoCommandTime = millis();
     servoAngle = commandedServoAngle;
+    servoCommanded = false;
 }
 
 void Rover::servoSweep(float commandedServoStartAngle, float commandedServoStopAngle, float commandedServoStepAngle) {
     servoSweepStart = commandedServoStartAngle;
     servoSweepEnd = commandedServoStopAngle;
     servoSweepStep = commandedServoStepAngle;
-    lastServoCommandTime = millis();
-    servoSweepDataReady = false;
     servoSweeping = true;
+    rangeFinderReadingReady = false;
+    didRangeReading = false;
 
     servoSet(servoSweepStart);
 }
 
 float* Rover::getServoSweepData() {
-    if (servoSweepDataReady) {return servoSweepData;}
-    else {return nullptr;}
+    // if (servoSweepDataReady) {return servoSweepData;}
+    // else {return nullptr;}
 }
 
 void Rover::led() {
@@ -96,18 +104,15 @@ void Rover::led() {
 
 String Rover::act() {
     // The response string
-    String response = "";
+    response = "";
 
     // Handle driving actions
     if (driving) {
         // Handle what to do if there is a request to disable motors or stop driving
         if (requestMotorDisable || requestDriveStop) {
             if (requestDriveStop) {
-                rightDriveDirection = leftDriveDirection = 0;
-                rightDriveDuration = leftDriveDuration = 0;
+                stopDrive();
                 response += "DRIVE STOPPED|";
-                driving = false;
-                requestDriveStop = false;
             }
             if (requestMotorDisable) {
                 toggleDrive(false);
@@ -128,10 +133,7 @@ String Rover::act() {
         }
         // If the command is no longer valid but no stop requested (i.e. drive timer just expired)
         else {
-            rightDriveDirection = leftDriveDirection = 0;
-            rightDriveDuration = leftDriveDuration = 0;
-            driving = false;
-            requestDriveStop = false;
+            stopDrive();
             response += "DRIVE COMPLETED|";
         }
     }
@@ -140,7 +142,7 @@ String Rover::act() {
     if (readingRange) {
         // If there is a request to stop reading range, re-set all attributes
         if (requestReadingRangeStop) {
-            rangeFinderTriggerStartTime = 0;
+            triggerRangeFinder = false;
             rangeFinderReadingReady = false;
             rangeFinderPulseStartTime = 0;
             rangeFinderPulseEndTime = 0;
@@ -149,26 +151,37 @@ String Rover::act() {
             response += "RANGE READ STOPPED|";
         }
         // Otherwise, if the trigger is started but it hasn't been 0.1 ms, keep the trigger pin up
-        else if (rangeFinderTriggerStartTime && millis() - rangeFinderTriggerStartTime < 0.01) {
-            digitalWrite(RANGEFINDER_TRIG_PIN, HIGH);
-        }
-        // If the trigger pulse is over, then keep it low and check for the echo pulse
         else {
+            digitalWrite(RANGEFINDER_TRIG_PIN, HIGH);
+            delayMicroseconds(10);
             digitalWrite(RANGEFINDER_TRIG_PIN, LOW);
-            currentRangeFinderPulseState = digitalRead(RANGEFINDER_OUT_PIN);
-            if (currentRangeFinderPulseState == HIGH && lastRangeFinderPulseState == LOW) {
-                rangeFinderPulseStartTime = millis();
-            }
-            else if (currentRangeFinderPulseState == LOW && lastRangeFinderPulseState == HIGH) {
-                rangeFinderPulseEndTime = millis();
-                lastRangeReading = (rangeFinderPulseEndTime - rangeFinderPulseStartTime)/1000.0 * 343.0 / 2;
-                response += "RANGE MEASUREMENT @ " + String(servoAngle) + " degrees: " = String(lastRangeReading)+ "|";
-                response += "RANGE MEASUREMENT DONE|";
-                readingRange = false;
-                rangeFinderTriggerStartTime = 0;
-            }
-            lastRangeFinderPulseState = currentRangeFinderPulseState;
+            lastRangeReading = pulseIn(RANGEFINDER_OUT_PIN, HIGH)/1000000.0 * 343.0 / 2;
+            response += "RANGE @ ";
+            response += String(servoAngle); 
+            response += String(" = ");
+            response += String(lastRangeReading);
+            response += String("|");
+            response += String("RANGE MEASUREMENT DONE|");
+            readingRange = false;
+            rangeFinderReadingReady = true;
         }
+        // // If the trigger pulse is over, then grab echo pin voltage check for the echo pulse
+        // else {
+        //     currentRangeFinderPulseState = digitalRead(RANGEFINDER_OUT_PIN);
+        //     if (currentRangeFinderPulseState == HIGH && lastRangeFinderPulseState == LOW) {
+        //         rangeFinderPulseStartTime = millis();
+        //     }
+        //     else if (currentRangeFinderPulseState == LOW && lastRangeFinderPulseState == HIGH) {
+        //         rangeFinderPulseEndTime = millis();
+        //         lastRangeReading = (rangeFinderPulseEndTime - rangeFinderPulseStartTime)/1000.0 * 343.0 / 2;
+        //         rangeFinderReadingReady = true;
+        //         response += "RANGE MEASUREMENT @ " + String(servoAngle) + " degrees: " + String(lastRangeReading)+ "|";
+        //         response += "RANGE MEASUREMENT DONE|";
+        //         readingRange = false;
+        //         triggerRangeFinder = false;
+        //     }
+        //     lastRangeFinderPulseState = currentRangeFinderPulseState;
+        // }
     }
 
     // If The servo is commanded
@@ -177,11 +190,13 @@ String Rover::act() {
             servoSetting = false;
             requestServoSettingStop = false;
         }
-        else if (millis() - lastServoCommandTime < 1000) {
+        else if (millis() - lastServoCommandTime < 2000 && !servoCommanded) {
             servo.write(servoAngle);
+            servoCommanded = true;
         }
-        else {
+        else if (millis() - lastServoCommandTime > 2000) {
             servoSetting = false;
+            response += "SERVO MOVED TO: " + String(servoAngle) + "|";
         }
     }
 
@@ -193,25 +208,19 @@ String Rover::act() {
             servoSweeping = false;
             requestServoSweepingStop = false;
         }
-        else if (servoSetting) {
-            ;
-        }
-        else if (!servoSetting && !readingRange && !rangeFinderReadingReady) {
+        else if (!servoSetting && !rangeFinderReadingReady) {
             doSingleDistanceMeasurement();
         }
-        else if (!servoSetting && readingRange && !rangeFinderReadingReady) {
-            ;
-        }
-        else if (!servoSetting && !readingRange && rangeFinderReadingReady) {
-            servoSweepData[servoAngle] = getSingleDistanceMeasurement();
-            if (servoAngle < servoSweepEnd) {servoSet(servoAngle + servoSweepStep);}
+        else if (rangeFinderReadingReady) {
+            if (servoAngle < servoSweepEnd) {servoSet(servoAngle + servoSweepStep);rangeFinderReadingReady=false;}
             else if (servoAngle == servoSweepEnd) {
-                servoSweepDataReady = true;
                 servoSweeping = false;
                 response += "SERVO SWEEP DONE|";
+                servoSet(90);
             }
         }
     }
 
     digitalWrite(LED_PIN, ledState);
+    return response;
 }
