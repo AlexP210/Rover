@@ -2,6 +2,7 @@
 #include "Rover.h"
 
 #define TERMINATION_CHARACTER '|'
+#define uint8_t byte
 
 // Debug flag
 bool debug = false;
@@ -17,9 +18,8 @@ bool commandHandled = false;
 Rover rover;
 
 void setup() {
-    if (debug) Serial.println("Starting initialize.");
-    // Open the communication lines
     Serial.begin(9600);
+    if (debug) Serial.println("Starting initialize.");
     rover.setup();
     if (debug) Serial.println("Ending initialize.");
 }
@@ -95,6 +95,10 @@ void loop() {
                 rover.led();
                 commandHandled = true;
             } 
+            else if (subcommand == "MPU") {
+                rover.requestMPUState();
+                commandHandled = true;
+            }
         }
 
         else if (subcommand == "SERVO") {
@@ -107,7 +111,6 @@ void loop() {
                 rover.servoSweep(getTerm(command, 2).toFloat(), getTerm(command, 3).toFloat(), getTerm(command, 4).toFloat());
                 commandHandled = true;            
             }
-
         }
 
         // Update state variables
@@ -121,7 +124,5 @@ void loop() {
 
     // Do the actions and get the response
     response = rover.act();
-    Serial.print(response);
+    if (response.length()) {Serial.print(response);}
 }
-
-

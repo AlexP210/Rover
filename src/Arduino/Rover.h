@@ -1,5 +1,6 @@
 #include <Servo.h>
 #include <Arduino.h>
+#include <Wire.h>
 
 class Rover {
     private:
@@ -14,25 +15,29 @@ class Rover {
         const int RIGHT_DRIVE_2_PIN = 10;
         const int RANGEFINDER_TRIG_PIN = 8;
         const int RANGEFINDER_OUT_PIN = 12;
-        const int SERVO_CONTROL_PIN = 11;
+        const int SERVO_CONTROL_PIN = 3;
         const int LED_PIN = 13;
 
-        // class variables
-
+        /* class variables */
+        // For driving
         bool driving = false; bool requestDriveStop = false; bool requestMotorDisable = false;
         float leftDriveStartTime = 0; float leftDriveDuration = 0; int leftDriveDirection = 0;
         float rightDriveStartTime = 0; float rightDriveDuration = 0; int rightDriveDirection = 0;
-
+        float deltaTime; float deltaPosition; float deltaVelocity;
+        // Rangefinder
         bool readingRange = false; bool requestReadingRangeStop = false;
         bool triggerRangeFinder = false; float lastRangeFinderPulseState = 0; float currentRangeFinderPulseState = 0;
         float rangeFinderPulseStartTime = 0; float rangeFinderPulseEndTime = 0;
         bool rangeFinderReadingReady = false; float lastRangeReading;
-
+        // Servo sweep
         bool servoSweeping = false; bool servoSetting; bool didRangeReading; bool requestServoSweepingStop = false; bool requestServoSettingStop;   
         Servo servo; int servoAngle = 90; float lastServoCommandTime = 0; bool servoCommanded = false;;
         float servoSweepStart = 90; float servoSweepEnd = 90; float servoSweepStep = 0;
-
+        // LED
         bool ledState = false;
+        // MPU
+        int MPU_ADDR = 0x68; char tmp_str[7]; float a_x, a_y, a_z; int16_t temperature; int16_t alpha_x, alpha_y, alpha_z;
+        bool outputtingMPUState; float lastMPUReadingTime;
 
         String response;
 
@@ -47,6 +52,10 @@ class Rover {
         void safe();
         void doSingleDistanceMeasurement();
         float getSingleDistanceMeasurement();
+        void updateProprioception();
+        void requestMPUState();
+        void startMPUTransmission();
+        char* convert_int16_to_str(int16_t i);
         void servoSet(float commandedServoAngle);
         void servoSweep(float commandedServoStartAngle, float commandedServoStopAngle, float commandedServoStepAngle);
         float* getServoSweepData();

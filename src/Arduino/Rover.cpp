@@ -1,6 +1,15 @@
 #include "Rover.h"
 
 void Rover::setup() {
+    // Open communication protocols
+    Wire.begin();
+    Wire.beginTransmission(MPU_ADDR); // Begins a transmission to the I2C slave (GY-521 board)
+    Wire.write(0x6B); // PWR_MGMT_1 register
+    Wire.write(0); // set to zero (wakes up the MPU-6050)
+    Wire.endTransmission(true);
+
+    // startMPUTransmission();
+
     // Configure output pins
     pinMode(LEFT_ENABLE_PIN, OUTPUT); digitalWrite(LEFT_ENABLE_PIN, LOW);
     pinMode(RIGHT_ENABLE_PIN, OUTPUT); digitalWrite(RIGHT_ENABLE_PIN, LOW);
@@ -101,6 +110,41 @@ void Rover::led() {
     ledState = !ledState;
 }
 
+void Rover::startMPUTransmission() {
+    Wire.beginTransmission(MPU_ADDR);
+    Wire.write(0x3B); // starting with register 0x3B (ACCEL_XOUT_H) [MPU-6000 and MPU-6050 Register Map and Descriptions Revision 4.2, p.40]
+    Wire.endTransmission(false); // the parameter indicates that the Arduino will send a restart. As a result, the connection is kept active.
+}
+
+char* Rover::convert_int16_to_str(int16_t i) { // converts int16 to string. Moreover, resulting strings will have the same length in the debug monitor.
+  sprintf(tmp_str, "%6d", i);
+  return tmp_str;
+}
+
+void Rover::updateProprioception() {
+    float MPUReadingTime = millis();
+    deltaTime = MPUReadingTime - lastMPUReadingTime;
+
+    Wire.beginTransmission(MPU_ADDR);
+    Wire.write(0x3B); // starting with register 0x3B (ACCEL_XOUT_H) [MPU-6000 and MPU-6050 Register Map and Descriptions Revision 4.2, p.40]
+    Wire.endTransmission(false); // the parameter indicates that the Arduino will send a restart. As a result, the connection is kept active.
+    Wire.requestFrom(MPU_ADDR, 7*2, false); // request a total of 7*2=14 registers
+    
+    // "Wire.read()<<8 | Wire.read();" means two registers are read and stored in the same variable
+    a_x = (float)(Wire.read()<<8 | Wire.read()) * 9.81 / 16640.0; // reading registers: 0x3B (ACCEL_XOUT_H) and 0x3C (ACCEL_XOUT_L)
+    a_y = (float)(Wire.read()<<8 | Wire.read()) * 9.81/ 16640.0; // reading registers: 0x3D (ACCEL_YOUT_H) and 0x3E (ACCEL_YOUT_L)
+    a_z = (float)(Wire.read()<<8 | Wire.read()) * 9.81/ 16640.0; // reading registers: 0x3F (ACCEL_ZOUT_H) and 0x40 (ACCEL_ZOUT_L)
+    temperature = Wire.read()<<8 | Wire.read(); // reading registers: 0x41 (TEMP_OUT_H) and 0x42 (TEMP_OUT_L)
+    alpha_x = Wire.read()<<8 | Wire.read(); // reading registers: 0x43 (GYRO_XOUT_H) and 0x44 (GYRO_XOUT_L)
+    alpha_y = Wire.read()<<8 | Wire.read(); // reading registers: 0x45 (GYRO_YOUT_H) and 0x46 (GYRO_YOUT_L)
+    alpha_z = Wire.read()<<8 | Wire.read();
+
+    // delay(100);
+}
+
+void Rover::requestMPUState() {
+    outputtingMPUState = true;
+}
 
 String Rover::act() {
     // The response string
@@ -165,23 +209,6 @@ String Rover::act() {
             readingRange = false;
             rangeFinderReadingReady = true;
         }
-        // // If the trigger pulse is over, then grab echo pin voltage check for the echo pulse
-        // else {
-        //     currentRangeFinderPulseState = digitalRead(RANGEFINDER_OUT_PIN);
-        //     if (currentRangeFinderPulseState == HIGH && lastRangeFinderPulseState == LOW) {
-        //         rangeFinderPulseStartTime = millis();
-        //     }
-        //     else if (currentRangeFinderPulseState == LOW && lastRangeFinderPulseState == HIGH) {
-        //         rangeFinderPulseEndTime = millis();
-        //         lastRangeReading = (rangeFinderPulseEndTime - rangeFinderPulseStartTime)/1000.0 * 343.0 / 2;
-        //         rangeFinderReadingReady = true;
-        //         response += "RANGE MEASUREMENT @ " + String(servoAngle) + " degrees: " + String(lastRangeReading)+ "|";
-        //         response += "RANGE MEASUREMENT DONE|";
-        //         readingRange = false;
-        //         triggerRangeFinder = false;
-        //     }
-        //     lastRangeFinderPulseState = currentRangeFinderPulseState;
-        // }
     }
 
     // If The servo is commanded
@@ -221,6 +248,17 @@ String Rover::act() {
         }
     }
 
+    if (outputtingMPUState) {
+        response += "a_x = " + String(a_x) + "|";
+        response += "a_y = " + String(a_y) + "|";
+        response += "a_z = " + String(a_z) + "|";
+        response += "alpha_x = " + String(alpha_x) + "|";
+        response += "alpha_y = " + String(alpha_y) + "|";
+        response += "alpha_z = " + String(alpha_z) + "|";
+        outputtingMPUState = false;
+    }
+
     digitalWrite(LED_PIN, ledState);
+    if (millis() - lastMPUReadingTime > 50) {updateProprioception();}
     return response;
 }

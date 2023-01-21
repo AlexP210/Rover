@@ -20,9 +20,13 @@ class RoverClient:
     def send(self, command):
         self.esp.send(command.encode())
         time.sleep(0.5)
-        try: return self.esp.recv(1024).decode().strip()
-        except BlockingIOError: return ":BLOCKING ERROR:"
-        except UnicodeDecodeError: return ":DECODE ERROR:"
+        try: 
+            response = self.esp.recv(1024)
+            # print(response)
+            return response.decode().strip()
+        except BlockingIOError: response = ":BLOCKING ERROR:"
+        except UnicodeDecodeError: response= ":DECODE ERROR:"
+        return response
 
     def parse(self, response):
         if "RANGE @" in response:

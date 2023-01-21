@@ -118,13 +118,14 @@ void loop() {
         char c = kerbal.read();
         if (c != TERMINATION_CHARARCTER) {fromKerbal += c;}
         else {
-          if (debug) Serial.println("ESP Received from Kerbal: " + fromKerbal);
-          if (debug) kerbal.println("ESP Received from Kerbal: " + fromKerbal);
-          if (fromKerbal.substring(0, 5) == "ESP: ") {
-            String espCommand = fromKerbal.substring(5);
-            if (espCommand == "DEBUG") {debug != debug;}
-          }
-          else {Serial.print(fromKerbal+"|");}
+          // if (debug) Serial.println("ESP Received from Kerbal: " + fromKerbal);
+          // if (debug) kerbal.println("ESP Received from Kerbal: " + fromKerbal);
+          // if (fromKerbal.substring(0, 5) == "ESP: ") {
+          //   String espCommand = fromKerbal.substring(5);
+          //   if (espCommand == "DEBUG") {debug != debug;}
+          // }
+          // else {Serial.print(fromKerbal+"|");}
+          Serial.print(fromKerbal+"|");
           fromKerbal = "";
         }
       }
@@ -134,8 +135,8 @@ void loop() {
         char c = Serial.read();
         if (c != TERMINATION_CHARARCTER) {fromArduino += c;}
         else {
-          if (debug) Serial.println("ESP Received from Arduino: " + fromArduino);
-          if (debug) kerbal.println("ESP Received from Kerbal: " + fromKerbal);
+          // if (debug) Serial.println("ESP Received from Arduino: " + fromArduino);
+          // if (debug) kerbal.println("ESP Received from Kerbal: " + fromKerbal);
           kerbal.print(fromArduino+"|");
           fromArduino = "";
         }
